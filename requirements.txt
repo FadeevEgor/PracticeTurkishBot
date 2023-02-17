@@ -1,0 +1,5 @@
+functions-framework==3.*
+requests==2.28.2
+flask==2.1.0
+python-telegram-bot-raw==20.1
+pymongo==4.3.3
