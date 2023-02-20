@@ -19,7 +19,7 @@ templates_folder = Path("templates")
 @command_routes.command("/about")
 def command_about(bot: Bot, user: User) -> None:
     with open(templates_folder/"about.md", encoding="utf-8") as f:
-        send_text(bot, user.id, f.read())
+        send_text(bot, user.id, f.read(), markdown=True)
     command_routes.direct("/id", bot, user)
     command_routes.direct("/token", bot, user)
     
