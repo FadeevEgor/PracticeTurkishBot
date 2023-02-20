@@ -15,7 +15,7 @@ class UsersTable:
     database_name: str
     collection_name: str
 
-    URL_template : ClassVar[string.Template]  = string.Template(
+    URL_template : ClassVar[string.Template] = string.Template(
         "${URL}?authSource=%24external&authMechanism=MONGODB-X509&retryWrites=true&w=majority"
     ) 
     
@@ -70,5 +70,6 @@ def get_token(table: UsersTable, user_id: int) -> str:
     return token
 
 
-table = UsersTable.from_config()
-print(table.lookup_token(321))
+if __name__ == "__main__":
+    table = UsersTable.from_config()
+    print(table.lookup_token(321))
