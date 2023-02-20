@@ -34,12 +34,12 @@ def command_start(bot: Bot, user: User) -> None:
     
 @command_routes.command("/id")
 def command_id(bot: Bot, user: User) -> None:
-    send_text(bot, user.id, f"Твой id: `{user.id}`")
+    send_text(bot, user.id, f"Твой id: `{user.id}`", markdown=True)
 
 @command_routes.command("/token")
 def command_token(bot: Bot, user: User) -> None:
     token = get_token(user_table, user.id)
-    send_text(bot, user.id, f"Твой токен: `{token}`")
+    send_text(bot, user.id, f"Твой токен: `{token}`", markdown=True)
 
 @command_routes.command("/config")
 def command_config(bot: Bot, user: User) -> None:
@@ -52,8 +52,8 @@ def command_config(bot: Bot, user: User) -> None:
         "id": user.id,
         "token": get_token(user_table, user.id)
     })
-    send_text(bot, user.id, first_message)
-    send_text(bot, user.id, second_message)
+    send_text(bot, user.id, first_message, markdown=True)
+    send_text(bot, user.id, second_message, markdown=True)
   
 
 @request_routes.route("/webhook")

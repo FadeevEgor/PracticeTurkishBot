@@ -41,9 +41,10 @@ def get_bot(token: str) -> Bot:
 def send_text(
     bot: Bot,
     chat_id: int,
-    text: str
+    text: str,
+    markdown: bool = False,
     ) -> str:
-    s = run(_send_text(bot, chat_id, text))
+    s = run(_send_text(bot, chat_id, text, markdown))
     sleep(0.1)
     return s
  
@@ -57,14 +58,15 @@ async def _get_bot(token: str) -> Bot:
 async def _send_text(
     bot: Bot,
     chat_id: int,
-    text: str
+    text: str,
+    markdown: bool = False
 ) -> str:
     async with bot:
         for chunk in split_into_chunks(text):
             await bot.send_message(
                     chat_id=chat_id,
                     text=text,
-                    parse_mode=ParseMode.MARKDOWN_V2
+                    parse_mode=ParseMode.MARKDOWN_V2 if markdown else None
                 )
     return "Message sent"
             
