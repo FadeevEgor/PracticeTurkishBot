@@ -1,5 +1,5 @@
 Меня зовут *PracticeTurkishBot*\. 
 
-Моя цель &mdash; помочь тебе с изучением турецкого языка\. На данный момент я умею только работать в паре с CLI\-приложением [PracticeTurkish](https://github.com/FadeevEgor/PracticeTurkish)\. Чтобы воспользоваться им, от тебя потребуется установленный *Python 3\.10\+*\. Процесс установки подробно описан по [ссылке](https://github.com/FadeevEgor/PracticeTurkish/blob/main/README.md#installation)\. 
+Моя цель — помочь тебе с изучением турецкого языка\. На данный момент я умею только работать в паре с CLI\-приложением [PracticeTurkish](https://github.com/FadeevEgor/PracticeTurkish)\. Чтобы воспользоваться им, от тебя потребуется установленный *Python 3\.10\+*\. Процесс установки подробно описан по [ссылке](https://github.com/FadeevEgor/PracticeTurkish/blob/main/README.md#installation)\. 
 
 Чтобы воспользоваться моими возможностями, тебе также потребуются твой *id* и *token*\. Они придут тебе следующими двумя сообщениями, но ты всегда сможет запросить их командами "/id" и "/token" соответственно\.  
