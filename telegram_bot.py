@@ -2,6 +2,7 @@ import json
 from configparser import ConfigParser
 from asyncio import run
 from time import sleep
+from typing import Optional
 
 from telegram import Bot, User, Update
 from telegram.constants import ParseMode
@@ -13,25 +14,35 @@ def bot_from_config(path: str = "config.ini") -> Bot:
     token = ":".join((config["BOT"]["id"], config["BOT"]["token"]))
     return get_bot(token)
 
-def parse_command(update_data: bytes, bot: Bot) -> tuple[User, list[str]]:
+def parse_command(update_data: bytes, bot: Bot) -> tuple[Optional[User], list[str]]:
     data = json.loads(update_data)
     print(data)
     update = Update.de_json(
         data,
         bot
     )
-    if update.message is None:
+
+    if update is None or update.message is None:
         print("No message")
-        return User(bot.id, bot.first_name, True), []
+        return None, []
 
     message = update.message
-    user = message.from_user
+    if message.from_user is None:
+        print("No user?")
+        return None, []
+   
+    user = message.from_user    
     if user.id == bot.id:
         print("Message from me")
-        return user, []
+        return None, []
 
+    if message.text is None:
+        print("No text")
+        return None, []
+
+    text = message.text
     commands = [
-        message.text[e.offset : e.offset + e.length] for e in message.entities
+        text[e.offset : e.offset + e.length] for e in message.entities
     ]  
     return user, commands 
 

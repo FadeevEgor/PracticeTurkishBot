@@ -5,7 +5,7 @@ from telegram import Bot, User
 
 Response = tuple[str, int]
 FlaskFunction = Callable[[Request], Response]
-TelegramFunction = Callable[[Bot, User], str]
+TelegramFunction = Callable[[Bot, User], None]
 
 class RequestRouter:
     def __init__(self) -> None:
@@ -37,11 +37,12 @@ class CommandRouter:
             return f
         return register
 
-    def direct(self, command: str, bot: Bot, user: User) -> str:
+    def direct(self, command: str, bot: Bot, user: User) -> None:
         try:
             f = self.functions[command]
         except KeyError:
-            return "Такой команде меня не научили"
+            print(f"An unsupported command {command} was called")
+            return None
         else:
             print(f"Calling {f.__name__} function")
             return f(bot, user)

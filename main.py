@@ -59,6 +59,8 @@ def command_config(bot: Bot, user: User) -> None:
 @request_routes.route("/webhook")
 def webhook(request: flask.Request) -> Response:
     user, commands = parse_command(request.data, bot)
+    if user is None:
+        return "Unexpected request from telegram", 200 
     for command in commands:
         command_routes.direct(command, bot, user)
     return "Ok", 200
@@ -70,10 +72,10 @@ def status(request: flask.Request) -> Response:
 @request_routes.route("/external")
 def external(request: flask.Request) -> Response:
     data = request.form
-    user_id = data["user id"]
+    user_id = int(data["user id"])
     text = data["text"]
     token = data["token"]
-    true_token = get_token(user_table, int(user_id))
+    true_token = get_token(user_table, user_id)
     if token == true_token: 
         send_text(bot, user_id, text)
         return "Message sent", 200
