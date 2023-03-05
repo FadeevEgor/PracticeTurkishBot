@@ -14,7 +14,7 @@ def bot_from_config(path: str = "config.ini") -> Bot:
     token = ":".join((config["BOT"]["id"], config["BOT"]["token"]))
     return get_bot(token)
 
-def parse_command(update_data: bytes, bot: Bot) -> tuple[Optional[User], list[str]]:
+def parse_command(update_data: bytes, bot: Bot) -> tuple[Optional[User], Optional[str], list[str]]:
     data = json.loads(update_data)
     print(data)
     update = Update.de_json(
@@ -24,27 +24,32 @@ def parse_command(update_data: bytes, bot: Bot) -> tuple[Optional[User], list[st
 
     if update is None or update.message is None:
         print("No message")
-        return None, []
+        return None, None, [] 
 
     message = update.message
     if message.from_user is None:
         print("No user?")
-        return None, []
+        return None, None, []
    
     user = message.from_user    
     if user.id == bot.id:
         print("Message from me")
-        return None, []
+        return None, None, []
 
     if message.text is None:
         print("No text")
-        return None, []
+        return None, None, []
 
     text = message.text
     commands = [
         text[e.offset : e.offset + e.length] for e in message.entities
-    ]  
-    return user, commands 
+    ]
+    for command in commands:
+        text = text.replace(command, "")
+    text = text.strip()
+    text = " ".join(text.split())
+
+    return user, text, commands 
 
 def get_bot(token: str) -> Bot:
     return run(_get_bot(token))
@@ -53,9 +58,9 @@ def send_text(
     bot: Bot,
     chat_id: int,
     text: str,
-    markdown: bool = False,
+    parse_mode: ParseMode|None = None
     ) -> str:
-    s = run(_send_text(bot, chat_id, text, markdown))
+    s = run(_send_text(bot, chat_id, text, parse_mode))
     sleep(0.1)
     return s
  
@@ -70,14 +75,14 @@ async def _send_text(
     bot: Bot,
     chat_id: int,
     text: str,
-    markdown: bool = False
+    parse_mode: ParseMode|None = None
 ) -> str:
     async with bot:
         for chunk in split_into_chunks(text):
             await bot.send_message(
                     chat_id=chat_id,
                     text=text,
-                    parse_mode=ParseMode.MARKDOWN_V2 if markdown else None
+                    parse_mode=parse_mode
                 )
     return "Message sent"
             
