@@ -80,7 +80,7 @@ class TranslationService(ABC):
             (Language.russian, Language.english),
             (Language.english, Language.russian),
             (Language.turkish, Language.english),
-            (Language.english, Language.russian),
+            (Language.english, Language.turkish),
         }
      
     async def _translate(
@@ -312,11 +312,13 @@ class TurkcesozlukNet(TranslationService):
     ) -> Optional[str]:
         query = "+".join(text.split())
         url = self.URL.format(query)
+        
         response = requestor.get(url)
         if response is None:
             return None
         
         name_attr = src_language_code + dst_language_code
+        print(name_attr)
         soup = BeautifulSoup(response.content, "html.parser")
         table = soup.find("table", {"name": name_attr})
         if table is None:
@@ -329,6 +331,3 @@ class TurkcesozlukNet(TranslationService):
         points = list.find_all("li")
         translated_text = " ".join(p.get_text() for p in points)
         return translated_text
-    
-if __name__ == "__main__":
-    pass
