@@ -1,6 +1,7 @@
-import json
-from configparser import ConfigParser
 from asyncio import run
+from configparser import ConfigParser
+import json
+from io import StringIO
 from time import sleep
 from typing import Optional
 
@@ -9,12 +10,17 @@ from telegram.constants import ParseMode
 
 
 def bot_from_config(path: str = "config.ini") -> Bot:
+    "Reads a token from the config and returns an instance of Bot with the token"
     config = ConfigParser()
     config.read('config.ini')
     token = ":".join((config["BOT"]["id"], config["BOT"]["token"]))
     return get_bot(token)
 
-def parse_command(update_data: bytes, bot: Bot) -> tuple[Optional[User], Optional[str], list[str]]:
+def parse_message(update_data: bytes, bot: Bot) -> tuple[Optional[User], Optional[str], list[str]]:
+    """
+    Parses content of a message from telegram.
+    Returns a sender user, cleared from commands text and list of commands. 
+    """
     data = json.loads(update_data)
     print(data)
     update = Update.de_json(
@@ -52,6 +58,7 @@ def parse_command(update_data: bytes, bot: Bot) -> tuple[Optional[User], Optiona
     return user, text, commands 
 
 def get_bot(token: str) -> Bot:
+    "Synchronous version of _get_bot."
     return run(_get_bot(token))
 
 def send_text(
@@ -60,11 +67,13 @@ def send_text(
     text: str,
     parse_mode: ParseMode|None = None
     ) -> str:
+    "Synchronous version of _send_text."
     s = run(_send_text(bot, chat_id, text, parse_mode))
     sleep(0.1)
     return s
  
 async def _get_bot(token: str) -> Bot:
+    "Creates a Bot instance with the token and checks its validity"
     bot = Bot(token)
     async with bot:
         user = await bot.get_me()
@@ -77,6 +86,11 @@ async def _send_text(
     text: str,
     parse_mode: ParseMode|None = None
 ) -> str:
+    """
+    Sends text to a user via the bot.
+    If the text is too big to be sent in a one message,
+    it is splitted and several messages are sent.
+    """
     async with bot:
         for chunk in split_into_chunks(text):
             await bot.send_message(
@@ -87,20 +101,21 @@ async def _send_text(
     return "Message sent"
             
 def split_into_chunks(text: str, max_length: int = 4096) -> list[str]:
+    "Splits text in chunks of length < 4096."
     rows = text.split("\n")
     
-    current_chunk : list[str] = []
+    current_chunk = StringIO()
     chunks : list[str] = []
     current_length = 0
     
     for row in rows:
         row_length = len(row)
         if current_length + row_length < max_length:
-            current_chunk.append(row)
+            current_chunk.write(row)
             current_length += row_length
         else:
-            chunks.append("".join(current_chunk))
-            current_chunk = []
+            chunks.append(current_chunk.getvalue())
+            current_chunk = StringIO()
             current_length = 0
     chunks.append("".join(current_chunk))
     return chunks

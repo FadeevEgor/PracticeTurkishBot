@@ -1,109 +1,218 @@
+from abc import ABC, abstractmethod
 import asyncio
 from configparser import ConfigParser
 from dataclasses import dataclass
-from enum import Enum
-from string import ascii_lowercase
-from typing import Optional
+from typing import Optional, Type, ClassVar
 
-import requests
-from fake_useragent import UserAgent
 from bs4 import BeautifulSoup
 from google.cloud import translate_v2 as translate
 
-
-DEMEK_URL = "https://demek.ru/soz/?q={}"
-GLOSBE_URL = "https://glosbe.com/{}/{}/{}"
-
-PUNCTUATION_SYMBOLS = set(" ,.")
-ENGLISH_SYMBOLS = set(ascii_lowercase) | PUNCTUATION_SYMBOLS
-TURKISH_SYMBOLS = (set(ascii_lowercase) | set("âçğıiöşü") | PUNCTUATION_SYMBOLS) - set("qwx")
-RUSSIAN_SYMBOLS = set("абвгдеёжзийклмнопрстуфхцчшщъыьэюя") | PUNCTUATION_SYMBOLS
-
-
-
-class Language(str, Enum):
-    russian = "ru"
-    turkish = "tk"
-    english = "en"
-
-
-def detect_language(text: str) -> Optional[Language]:
-    symbols = set(text.lower())
-    if symbols < TURKISH_SYMBOLS:
-        return Language.turkish
-    if symbols < RUSSIAN_SYMBOLS:
-        return Language.russian
-    if symbols < ENGLISH_SYMBOLS:
-        return Language.english
-    return None
+from requestor import Requestor
+from languages import Language, ISO_639_codes, detect_language 
 
 
 @dataclass
 class Translation:
-    language: Optional[Language] = None
-    demek: Optional[str] = None
-    glosbe: Optional[str] = None
-    google: Optional[str] = None
+    text: str
+    service: str
+
+
+@dataclass
+class TranslationsToTheSameLanguage:
+    language: Language
+    translations: list[Translation]
+
+
+class TranslationService(ABC):
+    """
+    ABC for translation service.
+    Each service should implement following methods:
+        - translate;
+        - representing_url;
+        - supported_languages (if not all language combinations are supported).
+
+    If the service uses an encoding different to ISO-639-1, the method language_encodings 
+    should be overridden.
+    """
+
+    @abstractmethod
+    async def translate(
+        self, 
+        text: str, 
+        src_language_code: str, 
+        dst_language_code: str,
+        requestor: Requestor
+    ) -> Optional[str]:
+        """
+        Takes text to be translated, its language and target language.
+        Returns translated text or None error is encountered or unsupported languages are specified. 
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def representing_url(self) -> str:
+        """
+        Returns a URL representing service.
+        """
+        raise NotImplementedError
+    
+    @property
+    def language_encoding(self) -> dict[Language, str]:
+        """
+        A mapping from a language to its code used by the service.
+        An empty dictionary corresponds to ISO-639-1.
+        All languages whose codes differ from ISO-639 standard should be listened here.
+        """
+        return {}
+
+    @property
+    def supported_languages(self) -> set[tuple[Language, Language]]:
+        """
+        A set of supported combinations of languages.
+        Each element is a tuple (l1, l2) of two Language instances.
+        Translation from l1 to l2 is supported iff tuple (l1, l2) is present in the set.
+        Should be overridden if not all combinations of languages are supported.
+        """
+        return {
+            (Language.russian, Language.turkish),
+            (Language.turkish, Language.russian),
+            (Language.russian, Language.english),
+            (Language.english, Language.russian),
+            (Language.turkish, Language.english),
+            (Language.english, Language.russian),
+        }
+     
+    async def _translate(
+        self, 
+        text: str, 
+        src: Language, 
+        dst: Language,
+        requestor: Requestor
+    ) -> Optional[Translation]:
+        """
+        Wraps method translate.
+        - checks if the language combination is supported;
+        - encodes languages via encode_language method;
+        - calls translate method and wraps result in a Translation object.
+        """
+        if (src, dst) not in self.supported_languages:
+            return None
+        src_language_code = self._encode_language(src)
+        dst_language_code = self._encode_language(dst)
+        translated_text = await self.translate(
+            text,
+            src_language_code,
+            dst_language_code,
+            requestor
+        )
+        if translated_text is None:
+            return None    
+        return Translation(translated_text, self.representing_url)
+
+    def _encode_language(self, language: Language) -> str:
+        """
+        Uses language_encoding property to encode a language.
+        Falls back to ISO-639-1 if the language is absent in language_encoding.
+        """
+        return self.language_encoding.get(language, ISO_639_codes[language])
 
 
 @dataclass
 class Translator:
-    google_client: translate.Client
-    user_agent: UserAgent = UserAgent(browsers=["chrome", "edge", "firefox", "safari", "opera"])
-    timeout: int = 3
+    """
+    The main class for translating. 
+    Aggregates all translation services via register_service decorator,
+    calls each of them and returns aggregated results to the caller. 
+    """
+    requestor: Requestor = Requestor()
+    services: ClassVar[list[TranslationService]] = []
 
-    def translate(self, text: str) -> tuple[Optional[Language], Translation, Translation]:
-        src_language = detect_language(text)
-        if src_language is None:
-            return (None, Translation(), Translation())
-        tr1, tr2 = asyncio.run(self._translate(text, src_language))
-        return (src_language, tr1, tr2)
+    @classmethod
+    def register_service(cls, service_type: Type[TranslationService]) -> Type[TranslationService]:
+        "Decorator for service registration."
+        service = service_type()
+        cls.services.append(service)
+        return service_type
 
-    async def _translate(self, text: str, src: Language) -> tuple[Translation, Translation]:
-        match src:
-            case Language.turkish:
-                ru_demek, ru_glosbe, en_glosbe, ru_google, en_google = await asyncio.gather(
-                    self.demek(text),
-                    self.glosbe(text, src, Language.russian),
-                    self.glosbe(text, src, Language.english),
-                    self.google(text, src, Language.russian),
-                    self.google(text, src, Language.english)
-                )
-                ru = Translation(Language.russian, ru_demek, ru_glosbe, ru_google)
-                en = Translation(Language.english, None, en_glosbe, en_google)
-                return ru, en
-            case Language.russian:
-                tk_demek, tk_glosbe, en_glosbe, tk_google, en_google = await asyncio.gather(
-                    self.demek(text),
-                    self.glosbe(text, src, Language.turkish),
-                    self.glosbe(text, src, Language.english),
-                    self.google(text, src, Language.turkish),
-                    self.google(text, src, Language.english)
-                )
-                tk = Translation(Language.turkish, tk_demek, tk_glosbe, tk_google)
-                en = Translation(Language.english, None, en_glosbe, en_google)
-                return tk, en
-            case Language.english:
-                ru_glosbe, tk_glosbe, ru_google, tk_google = await asyncio.gather(
-                    self.glosbe(text, src, Language.russian),
-                    self.glosbe(text, src, Language.turkish),
-                    self.google(text, src, Language.russian),
-                    self.google(text, src, Language.turkish)
-                )
-                ru = Translation(Language.russian, None, ru_glosbe, ru_google)
-                tk = Translation(Language.turkish, None, tk_glosbe, tk_google)
-                return ru, tk
- 
+    def translate(
+            self, 
+            text: str
+        ) -> tuple[
+            Optional[Language], 
+            Optional[tuple[TranslationsToTheSameLanguage, TranslationsToTheSameLanguage]]
+        ]:
+        """
+        Detects the language of the text and returns aggregated results of translation 
+        to all supported languages via all registered services. 
+        """
+        src = detect_language(text)
+        if src is None:
+            return (None, None)
+        dst_1, dst_2 = [x for x in Language if x != src]
+        return (
+            src, 
+            (
+                self.translate_to_the_language(text, src, dst_1), 
+                self.translate_to_the_language(text, src, dst_2),
+            ) 
+        )
 
-    async def demek(self, text: str) -> Optional[str]:
+    def translate_to_the_language(
+            self, 
+            text: str, 
+            src: Language, 
+            dst: Language
+        ) -> TranslationsToTheSameLanguage:    
+        translations = asyncio.run(self._translate_to_the_language(text, src, dst))
+        translations = [t for t in translations if t is not None]
+        return TranslationsToTheSameLanguage(
+            dst,
+            translations
+        )
+    
+    async def _translate_to_the_language(
+            self, 
+            text: str, 
+            src: Language, 
+            dst: Language
+        ) -> list[Optional[Translation]]:    
+        to_gather = []
+        for service in self.services:
+            to_gather.append(service._translate(text, src, dst, self.requestor))
+        return await asyncio.gather(*to_gather)
+    
+
+
+
+@Translator.register_service
+class DemekRu(TranslationService):
+    URL = "https://demek.ru/soz/?q={}"
+
+    @property
+    def representing_url(self) -> str:
+        return "demek.ru"
+
+    @property
+    def supported_languages(self) -> set[tuple[Language, Language]]:
+        return {
+            (Language.russian, Language.turkish),
+            (Language.turkish, Language.russian),
+        }
+    
+    async def translate(
+        self, 
+        text: str, 
+        src_language_code: str, 
+        dst_language_code: str,
+        requestor: Requestor
+    ) -> Optional[str]:
         query = "+".join(text.split())
-        url=DEMEK_URL.format(query)
-        try: 
-            response = self.request_get(url)
-        except (requests.TooManyRedirects, requests.HTTPError, requests.Timeout) as msg:
-            print(msg)
+        url = self.URL.format(query)
+        response = requestor.get(url)
+        if response is None:
             return None
-        
+
         print(f"demek: {query} - {response.status_code}")
         soup = BeautifulSoup(response.text, "html.parser")
         search_result = soup.find("div", "item_bsc")
@@ -111,38 +220,34 @@ class Translator:
             return None 
         return search_result.get_text()
 
-    async def google(
-            self, 
-            text: str, 
-            src: Language = Language.turkish, 
-            dst: Language = Language.russian
-        ) -> str:
-        result = self.google_client.translate(
-            values=text,
-            source_language=src, 
-            target_language=dst
-        )
-        return result["translatedText"]
+        
 
-    async def glosbe(
-            self, 
-            text: str, 
-            src: Language = Language.turkish, 
-            dst: Language = Language.russian
-        ) -> Optional[str]:
-        query = "%20".join(text.split())
-            
-        url = GLOSBE_URL.format(
-            src if src != Language.turkish else "tr", 
-            dst if dst != Language.turkish else "tr", 
+@Translator.register_service
+class GlosbeCom(TranslationService):
+    URL = "https://glosbe.com/{}/{}/{}"
+    
+    @property
+    def representing_url(self) -> str:
+        return "glosbe.com"
+
+    async def translate(
+        self, 
+        text: str, 
+        src_language_code: str, 
+        dst_language_code: str,
+        requestor: Requestor
+    ) -> Optional[str]:
+        query = "%20".join(text.split())   
+        url = self.URL.format(
+            src_language_code, 
+            dst_language_code, 
             query
         )
-        try:
-            response = self.request_get(url)
-        except (requests.TooManyRedirects, requests.HTTPError, requests.Timeout) as msg:
-            print(msg)
+        print(url)
+        response = requestor.get(url)
+        if response is None:
             return None
-        
+
         print(f"glosby: {query} - {response.status_code}")
         soup = BeautifulSoup(response.text, "html.parser")
         summary_section = soup.find("p", attrs={"id": "content-summary"})
@@ -150,9 +255,14 @@ class Translator:
         if bold_text is None:
             return None 
         return bold_text.get_text()
+            
+
+@dataclass
+class GoogleTranslateClient:
+    client: translate.Client
     
     @classmethod
-    def from_config(cls, path: str = "config.ini") -> "Translator":
+    def from_config(cls, path: str = "config.ini") -> "GoogleTranslateClient":
         config = ConfigParser()
         config.read(path)
         gcloud_key_path = config["GOOLGE FUNCTION"]["Key path"]
@@ -160,13 +270,65 @@ class Translator:
             translate.Client.from_service_account_json(gcloud_key_path),
         )
 
-    def request_get(self, url: str) -> requests.Response:
-        return requests.get(
-            url=url,
-            headers=self.request_header,
-            timeout=self.timeout
-        ) 
-
+@Translator.register_service
+class GoogleTranslate(TranslationService):
+    def __init__(self) -> None:
+        super().__init__()
+        self.client = GoogleTranslateClient.from_config()
+    
     @property
-    def request_header(self) -> dict[str, str]:
-        return {"User-Agent": str(self.user_agent.random)}
+    def representing_url(self) -> str:
+        return "google.com"
+
+    async def translate(
+        self, 
+        text: str, 
+        src_language_code: str, 
+        dst_language_code: str,
+        requestor: Requestor
+    ) -> Optional[str]:
+        response = self.client.client.translate(
+            values=text,
+            source_language=src_language_code, 
+            target_language=dst_language_code
+        )
+        return response["translatedText"]
+    
+
+@Translator.register_service
+class TurkcesozlukNet(TranslationService):
+    URL = "https://www.turkcesozluk.net/index.php?word={}"
+        
+    @property
+    def representing_url(self) -> str:
+        return "turkcesozluk.net"
+    
+    async def translate(
+        self, 
+        text: str, 
+        src_language_code: str, 
+        dst_language_code: str,
+        requestor: Requestor
+    ) -> Optional[str]:
+        query = "+".join(text.split())
+        url = self.URL.format(query)
+        response = requestor.get(url)
+        if response is None:
+            return None
+        
+        name_attr = src_language_code + dst_language_code
+        soup = BeautifulSoup(response.content, "html.parser")
+        table = soup.find("table", {"name": name_attr})
+        if table is None:
+            return None
+        
+        table_content = table.find_all("tr")[1]
+        first_row = table_content.find("tr")
+        cell = first_row.find_all("td")[1]
+        list = cell.find("ul", {"class": "ulc"}) 
+        points = list.find_all("li")
+        translated_text = " ".join(p.get_text() for p in points)
+        return translated_text
+    
+if __name__ == "__main__":
+    pass
