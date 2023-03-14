@@ -328,6 +328,8 @@ class TurkcesozlukNet(TranslationService):
         first_row = table_content.find("tr")
         cell = first_row.find_all("td")[1]
         list = cell.find("ul", {"class": "ulc"}) 
+        if list is None:
+            return cell.get_text()
         points = list.find_all("li")
-        translated_text = " ".join(p.get_text() for p in points)
-        return translated_text
+        return " ".join(p.get_text() for p in points)    
+         
