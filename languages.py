@@ -12,8 +12,8 @@ RUSSIAN_SYMBOLS = set("абвгдеёжзийклмнопрстуфхцчшщъ�
 
 
 class Language(str, Enum):
-    turkish = auto()
     russian = auto()
+    turkish = auto()
     english = auto()
 
 
@@ -45,5 +45,5 @@ genitive_cases: dict[Language, str] = {
 lang_to_flag: dict[Language, str] = {
     Language.russian: emojize(":Russia:"),
     Language.turkish: emojize(":Turkey:"),
-    Language.english: emojize(":England:"),   
+    Language.english: emojize(":United_Kingdom:"),   
 }
