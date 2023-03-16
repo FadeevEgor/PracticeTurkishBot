@@ -81,7 +81,7 @@ def get_translation(text: str) -> str:
     result.write(f'Перевод для "<b>{text}</b>" с {src_flag}<b>{src_gen}</b>{src_flag} языка.\n\n')
     for dst in dst_langs:
         dst_flag = lang_to_flag[dst.language]
-        result.write(f"{src_flag} -> {dst_flag}:\n")
+        result.write(f"{src_flag} ➔ {dst_flag}:\n")
         for t in dst.translations:
             result.write(f"<b>{t.service}</b>: {t.text}.\n") 
         result.write("\n")
