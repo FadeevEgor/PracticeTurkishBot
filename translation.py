@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, Type, ClassVar
 
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 from google.cloud import translate_v2 as translate
 
 from requestor import Requestor
@@ -330,6 +331,56 @@ class TurkcesozlukNet(TranslationService):
         list = cell.find("ul", {"class": "ulc"}) 
         if list is None:
             return cell.get_text()
-        points = list.find_all("li")
-        return " ".join(p.get_text() for p in points)    
-         
+        points = list.find_all("li", limit=5)
+        return " ".join(p.get_text() for p in points)   
+
+
+@Translator.register_service
+class TurengCom(TranslationService):
+    URL = "https://tureng.com/en/turkish-english/{}"
+        
+    @property
+    def representing_url(self) -> str:
+        return "tureng.com"
+    
+    async def translate(
+        self, 
+        text: str, 
+        src_language_code: str, 
+        dst_language_code: str,
+        requestor: Requestor
+    ) -> Optional[str]:
+        query = "%20".join(text.split())
+        url = self.URL.format(query)
+        
+        response = requestor.get(url)
+        if response is None:
+            return None
+        
+        string = f"{dst_language_code} {src_language_code} dictionary".title()
+        dst_language = Language[dst_language_code]
+        soup = BeautifulSoup(response.content, "html.parser")
+        def h2_with_right_text(tag: Tag) -> bool:
+            return tag.name == "h2" and string in tag.get_text() 
+        h2 = soup.find(h2_with_right_text)
+        if h2 is None:
+            return None
+        
+        table = h2.next_sibling.next_sibling
+        translations = table.find_all_next("td", {"lang": ISO_639_codes[dst_language]}, limit=5)
+        translations = [t.get_text().strip() for t in translations]
+        return "; ".join(translations)
+
+    @property
+    def supported_languages(self) -> set[tuple[Language, Language]]:
+        return {
+            (Language.english, Language.turkish),
+            (Language.turkish, Language.english)
+        }
+    
+    @property
+    def language_encoding(self) -> dict[Language, str]:
+        return {
+            Language.english: "english",
+            Language.turkish: "turkish"
+        }
