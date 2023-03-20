@@ -28,16 +28,12 @@ def command_about(bot: Bot, user: User) -> None:
     "Generates response message to the command `/about`"
     with open(templates_folder/"about.md", encoding="utf-8") as f:
         send_text(bot, user.id, f.read(), parse_mode=ParseMode.MARKDOWN_V2)
-    command_routes.direct("/id", bot, user)
-    command_routes.direct("/token", bot, user)
-    
     
 @command_routes.command("/start")
 def command_start(bot: Bot, user: User) -> None:
     "Generates response message to the command `/start`"
-    send_text(bot, user.id, fr"Привет, {user.first_name}\!")
+    send_text(bot, user.id, fr"Привет, {user.first_name}!")
     command_routes.direct("/about", bot, user)
-    command_routes.direct("/config", bot, user)
     
 @command_routes.command("/id")
 def command_id(bot: Bot, user: User) -> None:
@@ -55,9 +51,9 @@ def command_config(bot: Bot, user: User) -> None:
     "Generates response message to the command `/config`"
     with open(templates_folder/"config.md", encoding="utf-8") as f:
         first_message = f.read()
+    
     with open(templates_folder/"config_template.md", encoding="utf-8") as f:
         template = string.Template(f.read())
-    
     second_message = template.substitute({
         "id": user.id,
         "token": get_token(user_table, user.id)
