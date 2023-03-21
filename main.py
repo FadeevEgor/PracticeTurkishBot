@@ -79,7 +79,8 @@ def get_translation(text: str) -> str:
         dst_flag = lang_to_flag[dst.language]
         result.write(f"{src_flag} ➔ {dst_flag}:\n")
         for t in dst.translations:
-            result.write(f"<b>{t.service}</b>: {t.text}.\n") 
+            result.write(f'<a href="{t.url}"><b>{t.service_name}</b></a>: {t.text}.\n')
+            # result.write(f"<b>{t.service_name}</b>: {t.text}.\n") 
         result.write("\n")
     print(dst.translations)
     return result.getvalue()

@@ -96,7 +96,8 @@ async def _send_text(
             await bot.send_message(
                     chat_id=chat_id,
                     text=text,
-                    parse_mode=parse_mode
+                    parse_mode=parse_mode,
+                    disable_web_page_preview=True,
                 )
     return "Message sent"
             

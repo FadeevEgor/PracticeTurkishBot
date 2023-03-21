@@ -15,7 +15,8 @@ from languages import Language, ISO_639_codes, detect_language
 @dataclass
 class Translation:
     text: str
-    service: str
+    service_name: str
+    url: str
 
 
 @dataclass
@@ -43,7 +44,7 @@ class TranslationService(ABC):
         src_language_code: str, 
         dst_language_code: str,
         requestor: Requestor
-    ) -> Optional[str]:
+    ) -> Optional[tuple[str, str]]:
         """
         Takes text to be translated, its language and target language.
         Returns translated text or None error is encountered or unsupported languages are specified. 
@@ -52,7 +53,7 @@ class TranslationService(ABC):
 
     @property
     @abstractmethod
-    def representing_url(self) -> str:
+    def service_name(self) -> str:
         """
         Returns a URL representing service.
         """
@@ -101,15 +102,17 @@ class TranslationService(ABC):
             return None
         src_language_code = self._encode_language(src)
         dst_language_code = self._encode_language(dst)
-        translated_text = await self.translate(
+        response = await self.translate(
             text,
             src_language_code,
             dst_language_code,
             requestor
         )
-        if translated_text is None:
-            return None    
-        return Translation(translated_text, self.representing_url)
+        if response is None:
+            return None
+
+        translated_text, url = response    
+        return Translation(translated_text, self.service_name, url)
 
     def _encode_language(self, language: Language) -> str:
         """
@@ -191,7 +194,7 @@ class DemekRu(TranslationService):
     URL = "https://demek.ru/soz/?q={}"
 
     @property
-    def representing_url(self) -> str:
+    def service_name(self) -> str:
         return "demek.ru"
 
     @property
@@ -207,7 +210,7 @@ class DemekRu(TranslationService):
         src_language_code: str, 
         dst_language_code: str,
         requestor: Requestor
-    ) -> Optional[str]:
+    ) -> Optional[tuple[str, str]]:
         query = "+".join(text.split())
         url = self.URL.format(query)
         response = requestor.get(url)
@@ -219,7 +222,8 @@ class DemekRu(TranslationService):
         search_result = soup.find("div", "item_bsc")
         if search_result is None:
             return None 
-        return search_result.get_text()
+        translated_text = search_result.get_text()
+        return translated_text, url
 
         
 
@@ -228,7 +232,7 @@ class GlosbeCom(TranslationService):
     URL = "https://glosbe.com/{}/{}/{}"
     
     @property
-    def representing_url(self) -> str:
+    def service_name(self) -> str:
         return "glosbe.com"
 
     async def translate(
@@ -237,7 +241,7 @@ class GlosbeCom(TranslationService):
         src_language_code: str, 
         dst_language_code: str,
         requestor: Requestor
-    ) -> Optional[str]:
+    ) -> Optional[tuple[str, str]]:
         query = "%20".join(text.split())   
         url = self.URL.format(
             src_language_code, 
@@ -255,7 +259,9 @@ class GlosbeCom(TranslationService):
         bold_text = summary_section.find("strong")
         if bold_text is None:
             return None 
-        return bold_text.get_text()
+        
+        translated_text = bold_text.get_text()
+        return translated_text, url
             
 
 @dataclass
@@ -273,12 +279,13 @@ class GoogleTranslateClient:
 
 @Translator.register_service
 class GoogleTranslate(TranslationService):
+    URL = "https://translate.google.com/?sl={}&tl={}&text={}&op=translate"
     def __init__(self) -> None:
         super().__init__()
         self.client = GoogleTranslateClient.from_config()
     
     @property
-    def representing_url(self) -> str:
+    def service_name(self) -> str:
         return "google.com"
 
     async def translate(
@@ -287,13 +294,18 @@ class GoogleTranslate(TranslationService):
         src_language_code: str, 
         dst_language_code: str,
         requestor: Requestor
-    ) -> Optional[str]:
+    ) -> Optional[tuple[str, str]]:
+        
         response = self.client.client.translate(
             values=text,
             source_language=src_language_code, 
             target_language=dst_language_code
         )
-        return response["translatedText"]
+        translated_text = response["translatedText"]
+        
+        query = "%20".join(text.split())   
+        url = self.URL.format(src_language_code, dst_language_code, query)
+        return translated_text, url
     
 
 @Translator.register_service
@@ -301,7 +313,7 @@ class TurkcesozlukNet(TranslationService):
     URL = "https://www.turkcesozluk.net/index.php?word={}"
         
     @property
-    def representing_url(self) -> str:
+    def service_name(self) -> str:
         return "turkcesozluk.net"
     
     async def translate(
@@ -310,7 +322,7 @@ class TurkcesozlukNet(TranslationService):
         src_language_code: str, 
         dst_language_code: str,
         requestor: Requestor
-    ) -> Optional[str]:
+    ) -> Optional[tuple[str, str]]:
         query = "+".join(text.split())
         url = self.URL.format(query)
         
@@ -332,7 +344,9 @@ class TurkcesozlukNet(TranslationService):
         if list is None:
             return cell.get_text()
         points = list.find_all("li", limit=5)
-        return " ".join(p.get_text() for p in points)   
+
+        translated_text = " ".join(p.get_text() for p in points)
+        return translated_text, url
 
 
 @Translator.register_service
@@ -340,7 +354,7 @@ class TurengCom(TranslationService):
     URL = "https://tureng.com/en/turkish-english/{}"
         
     @property
-    def representing_url(self) -> str:
+    def service_name(self) -> str:
         return "tureng.com"
     
     async def translate(
@@ -349,7 +363,7 @@ class TurengCom(TranslationService):
         src_language_code: str, 
         dst_language_code: str,
         requestor: Requestor
-    ) -> Optional[str]:
+    ) -> Optional[tuple[str, str]]:
         query = "%20".join(text.split())
         url = self.URL.format(query)
         
@@ -369,7 +383,8 @@ class TurengCom(TranslationService):
         table = h2.next_sibling.next_sibling
         translations = table.find_all_next("td", {"lang": ISO_639_codes[dst_language]}, limit=5)
         translations = [t.get_text().strip() for t in translations]
-        return "; ".join(translations)
+        translated_text = "; ".join(translations)
+        return translated_text, url
 
     @property
     def supported_languages(self) -> set[tuple[Language, Language]]:
