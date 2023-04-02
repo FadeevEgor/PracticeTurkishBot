@@ -1,18 +1,15 @@
 from pathlib import Path 
 import string
-from io import StringIO
 
 import flask
 import functions_framework
 from telegram import Bot, User
 from telegram.constants import ParseMode
-from emoji import emojize
 
+from database import UsersTable
 from router import RequestRouter, CommandRouter, Response
 from telegram_bot import bot_from_config, send_text, parse_message
-from user_token import UsersTable, get_token
-from translation import Translator
-from languages import lang_to_flag, genitive_cases
+from translation import Translator, get_translation
 
 
 request_routes = RequestRouter()
@@ -33,7 +30,7 @@ def command_about(bot: Bot, user: User) -> None:
 def command_start(bot: Bot, user: User) -> None:
     "Generates response message to the command `/start`"
     send_text(bot, user.id, fr"Привет, {user.first_name}!")
-    command_routes.direct("/about", bot, user)
+    command_routes.direct("/about", bot, user) 
     
 @command_routes.command("/id")
 def command_id(bot: Bot, user: User) -> None:
@@ -43,7 +40,7 @@ def command_id(bot: Bot, user: User) -> None:
 @command_routes.command("/token")
 def command_token(bot: Bot, user: User) -> None:
     "Generates response message to the command `/token`"
-    token = get_token(user_table, user.id)
+    token = user_table.get_token(user.id)
     send_text(bot, user.id, f"Твой токен: `{token}`", parse_mode=ParseMode.MARKDOWN_V2)
 
 @command_routes.command("/config")
@@ -56,35 +53,22 @@ def command_config(bot: Bot, user: User) -> None:
         template = string.Template(f.read())
     second_message = template.substitute({
         "id": user.id,
-        "token": get_token(user_table, user.id)
+        "token": user_table.get_token(user.id)
     })
     send_text(bot, user.id, first_message, parse_mode=ParseMode.MARKDOWN_V2)
     send_text(bot, user.id, second_message, parse_mode=ParseMode.MARKDOWN_V2)
 
-def get_translation(text: str) -> str:
-    """
-    Given text of a message by an user, generates a content for a response message 
-    based on results by the translator instance.
-    """
-    src, dst_langs = translator.translate(text)
-    if src is None:
-        awkward_emoji = emojize(":downcast_face_with_sweat:")
-        return f"Не смог распознать язык {awkward_emoji}."
-    
-    src_flag = lang_to_flag[src]
-    src_gen = genitive_cases[src]
-    result = StringIO()
-    result.write(f'Перевод для "<b>{text}</b>" с {src_flag}<b>{src_gen}</b>{src_flag} языка.\n\n')
-    for dst in dst_langs:
-        dst_flag = lang_to_flag[dst.language]
-        result.write(f"{src_flag} ➔ {dst_flag}:\n")
-        for t in dst.translations:
-            result.write(f'<a href="{t.url}"><b>{t.service_name}</b></a>: {t.text}.\n')
-            # result.write(f"<b>{t.service_name}</b>: {t.text}.\n") 
-        result.write("\n")
-    print(dst.translations)
-    return result.getvalue()
+@command_routes.command("/subscribe")
+def subscribe(bot: Bot, user: User) -> None:
+    user_table.subscribe(user.id)
+    message = 'Вы подписались на "слова дня"!'
+    send_text(bot, user.id, message)
 
+@command_routes.command("/unsubscribe")
+def subscribe(bot: Bot, user: User) -> None:
+    user_table.unsubscribe(user.id) 
+    message = 'Вы отписались от "слова дня"!'
+    send_text(bot, user.id, message)
 
 @request_routes.route("/webhook")
 def webhook(request: flask.Request) -> Response:
@@ -97,13 +81,11 @@ def webhook(request: flask.Request) -> Response:
     if user is None:
         return "Unexpected request from telegram", 200
     if text is not None and text != "":
-        translation = get_translation(text)
+        translation = get_translation(translator, text)
         send_text(bot, user.id, translation, parse_mode=ParseMode.HTML)
     for command in commands:
         command_routes.direct(command, bot, user)
     return "Ok", 200
-
-
 
 @request_routes.route("/external")
 def external(request: flask.Request) -> Response:
@@ -115,12 +97,12 @@ def external(request: flask.Request) -> Response:
     user_id = int(data["user id"])
     text = data["text"]
     token = data["token"]
-    true_token = get_token(user_table, user_id)
-    if token == true_token: 
+    
+    if user_table.check_token(user_id, token): 
         send_text(bot, user_id, text)
         return "Message sent", 200
+    print("Wrong token")
     return "Wrong token.", 403
-
 
 @request_routes.route("/")
 def status(request: flask.Request) -> Response:
@@ -128,7 +110,6 @@ def status(request: flask.Request) -> Response:
     return """<title>PracticeTurkishBot</title>
     <H1>The bot is online</H1>
     """, 200
-
 
 @functions_framework.http
 def http(request: flask.Request):

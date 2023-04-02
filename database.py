@@ -1,11 +1,17 @@
-from dataclasses import dataclass
-import string
-import secrets 
-from typing import Optional, ClassVar
 from configparser import ConfigParser
+from dataclasses import dataclass
+import hmac
+import secrets 
+import string
+from typing import Optional, ClassVar
 
 from pymongo import MongoClient
 from pymongo.collection import Collection
+
+
+def generate_token() -> str:
+    alphabet = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(alphabet) for i in range(8))
 
 
 @dataclass
@@ -28,20 +34,50 @@ class UsersTable:
         database = client[self.database_name]
         return database[self.collection_name]      
 
-    def lookup_token(self, user_id: int) -> Optional[str]:
-        collection = self.get_collection()
-        result = list(collection.find({"user_id": user_id}))
-        if not result:
-            return None
-        return result[0]["token"]
-
-    def insert_one(self, user_id: int, token: str) -> str:
+    def new_user(self, user_id: int, token: str) -> None:
         collection = self.get_collection()
         collection.insert_one({
             "user_id": user_id,
-            "token": token
+            "token": token,
+            "wotd": False,
         })
-        return token
+    
+    def lookup_token(self, user_id: int) -> Optional[str]:
+        collection = self.get_collection()
+        result = collection.find_one({"user_id": user_id})
+        if not result:
+            return None
+        return result["token"]
+
+    def get_token(self, user_id: int) -> str:
+        token = self.lookup_token(user_id)
+        if token is None:
+            token = generate_token()
+            self.new_user(user_id, token)
+        return token    
+
+    def check_token(self, user_id: int, given_token: str) -> bool:
+        true_token = self.get_token(user_id)
+        return hmac.compare_digest(true_token, given_token)
+
+
+    def subscribe(self, user_id) -> None:
+        collection = self.get_collection()
+        collection.find_one_and_update(
+            filter={"user_id": user_id}, 
+            update={"$set": {
+            "wotd": True
+            }
+        })
+
+    def unsubscribe(self, user_id) -> None:
+        collection = self.get_collection()
+        collection.find_one_and_update(
+            filter={"user_id": user_id}, 
+            update={"$set": {
+            "wotd": False
+            }
+        })
 
     @classmethod
     def from_config(cls, path: str = "config.ini"):
@@ -56,20 +92,3 @@ class UsersTable:
             db_info['Database name'],
             db_info['Collection name']
         )
-
-
-def generate_token() -> str:
-    alphabet = string.ascii_letters + string.digits
-    return ''.join(secrets.choice(alphabet) for i in range(8))
-
-
-def get_token(table: UsersTable, user_id: int) -> str:
-    token = table.lookup_token(user_id)
-    if token is None:
-        token = table.insert_one(user_id, generate_token())
-    return token
-
-
-if __name__ == "__main__":
-    table = UsersTable.from_config()
-    print(table.lookup_token(321))

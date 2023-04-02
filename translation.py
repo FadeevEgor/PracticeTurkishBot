@@ -2,14 +2,46 @@ from abc import ABC, abstractmethod
 import asyncio
 from configparser import ConfigParser
 from dataclasses import dataclass
+from io import StringIO
 from typing import Optional, Type, ClassVar
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from google.cloud import translate_v2 as translate
+from emoji import emojize
 
 from requestor import Requestor
-from languages import Language, ISO_639_codes, detect_language 
+from languages import (
+    Language, 
+    ISO_639_codes, 
+    detect_language, 
+    lang_to_flag,
+    genitive_cases,
+) 
+
+
+def get_translation(translator: "Translator", text: str) -> str:
+    """
+    Given text of a message by an user, generates a content for a response message 
+    based on results by the translator instance.
+    """
+    src, dst_langs = translator.translate(text)
+    if src is None:
+        awkward_emoji = emojize(":downcast_face_with_sweat:")
+        return f"Не смог распознать язык {awkward_emoji}."
+    
+    src_flag = lang_to_flag[src]
+    src_gen = genitive_cases[src]
+    result = StringIO()
+    result.write(f'Перевод для "<b>{text}</b>" с {src_flag}<b>{src_gen}</b>{src_flag} языка.\n\n')
+    for dst in dst_langs:
+        dst_flag = lang_to_flag[dst.language]
+        result.write(f"{src_flag} ➔ {dst_flag}:\n")
+        for t in dst.translations:
+            result.write(f'<a href="{t.url}"><b>{t.service_name}</b></a>: {t.text}.\n') 
+        result.write("\n")
+    print(dst.translations)
+    return result.getvalue()
 
 
 @dataclass
@@ -342,7 +374,7 @@ class TurkcesozlukNet(TranslationService):
         cell = first_row.find_all("td")[1]
         list = cell.find("ul", {"class": "ulc"}) 
         if list is None:
-            return cell.get_text()
+            return cell.get_text(), url
         points = list.find_all("li", limit=5)
 
         translated_text = " ".join(p.get_text() for p in points)
