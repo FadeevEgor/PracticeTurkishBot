@@ -1,7 +1,7 @@
 from dataclasses import asdict
+from typing import Any
 import functions_framework  # type: ignore
 from flask import Request
-
 from translation import Translator, get_translation
 from router import RequestRouter
 
@@ -11,13 +11,13 @@ app = RequestRouter()
 
 
 @app.route("/", "POST")
-def translate(data: dict) -> dict:
+def translate(data: dict[str, Any]) -> dict:
     text = data["text"]
     return asdict(get_translation(translator, text))
 
 
 @app.route("/", "GET")
-def status(data: dict) -> str:
+def status(_: dict[str, Any]) -> str:
     return """<title>TranslationFunction</title>
     <H1>The function is online.</H1>"""
 

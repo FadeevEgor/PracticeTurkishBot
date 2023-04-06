@@ -1,4 +1,4 @@
-from enum import Enum, auto
+from enum import Enum
 from string import ascii_letters
 from typing import Optional
 

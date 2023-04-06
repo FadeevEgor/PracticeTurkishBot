@@ -1,11 +1,9 @@
 import json
-from enum import Enum
-from typing import Callable, Sequence, TypeAlias, TypeVar, ParamSpec, Any
-
-from flask import Request, jsonify
+from typing import Callable, TypeAlias, Any
+from flask import Request, jsonify, abort
 
 
-Route: TypeAlias = Callable[[dict], Any]
+Route: TypeAlias = Callable[[dict[str, Any]], Any]
 
 
 class RequestRouter:
@@ -42,8 +40,7 @@ class RequestRouter:
             f = self.functions[method][path]
         except KeyError:
             print(f"Dispatch error: {path, method}")
-            return "<H1>Page not found</H1>", 404
-        else:
-            print(f"Calling {f.__name__} function")
-            data = json.loads(request.data)
-            return jsonify(f(data))
+            return abort(404)
+        print(f"Calling {f.__name__} function")
+        data = json.loads(request.data)
+        return jsonify(f(data))

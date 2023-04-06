@@ -7,7 +7,7 @@ from typing import Optional, Type, ClassVar
 
 from aiohttp import ClientSession  # type: ignore
 from bs4 import BeautifulSoup
-from bs4.element import Tag, NavigableString, PageElement
+from bs4.element import Tag, NavigableString
 from google.cloud import translate_v2 as translate  # type: ignore
 from emoji import emojize  # type: ignore
 from fake_useragent import UserAgent  # type: ignore
@@ -21,11 +21,8 @@ from languages import (
 )
 
 
-TIMEOUT = 3
-
-
-async def make_request(url: str, session: ClientSession) -> str:
-    async with session.get(url=url, timeout=TIMEOUT) as r:
+async def make_request(url: str, session: ClientSession, timeout: int = 3) -> str:
+    async with session.get(url=url, timeout=timeout) as r:
         return await r.text()
 
 
@@ -135,7 +132,7 @@ class TranslationService(ABC):
             (Language.english, Language.turkish),
         }
 
-    async def _translate(
+    async def wrap_translate(
         self, text: str, src: Language, dst: Language, session: ClientSession
     ) -> Optional[TranslationUnit]:
         """
@@ -217,7 +214,7 @@ class Translator:
         to_gather = []
         async with ClientSession(headers={"UserAgent": UserAgent().random}) as session:
             for service in self.services:
-                to_gather.append(service._translate(text, src, dst, session))
+                to_gather.append(service.wrap_translate(text, src, dst, session))
             return await asyncio.gather(*to_gather)
 
 
