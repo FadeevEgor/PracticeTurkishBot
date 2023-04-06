@@ -1,14 +1,16 @@
 from enum import Enum, auto
-from string import ascii_lowercase
+from string import ascii_letters
 from typing import Optional
 
 from emoji import emojize
 
 
 PUNCTUATION_SYMBOLS = set(" ,.")
-ENGLISH_SYMBOLS = set(ascii_lowercase) | PUNCTUATION_SYMBOLS
-TURKISH_SYMBOLS = (set(ascii_lowercase) | set("âçğıiöşü") | PUNCTUATION_SYMBOLS) - set("qwx")
-RUSSIAN_SYMBOLS = set("абвгдеёжзийклмнопрстуфхцчшщъыьэюя") | PUNCTUATION_SYMBOLS
+ENGLISH_SYMBOLS = set(ascii_letters) | PUNCTUATION_SYMBOLS
+TURKISH_SYMBOLS = (ENGLISH_SYMBOLS | set("âçÇğĞıİöÖşŞüÜ")) - set("qQwWxX")
+RUSSIAN_SYMBOLS = set(
+    "аАбБвВгГдДеЕёЁжЖзЗиИйЙкКлЛмМнНоОпПрРсСтТуУфФхХцЦчЧшШщЩъЪыЫьЬэЭюЮяЯ"
+) | PUNCTUATION_SYMBOLS
 
 
 class Language(str, Enum):
@@ -19,7 +21,7 @@ class Language(str, Enum):
 
 def detect_language(text: str) -> Optional[Language]:
     "Detects language using set of symbols"
-    symbols = set(text.lower())
+    symbols = set(text)
     if symbols < TURKISH_SYMBOLS:
         return Language.turkish
     if symbols < RUSSIAN_SYMBOLS:

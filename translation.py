@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from io import StringIO
 from typing import Optional, Type, ClassVar
 
+
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from google.cloud import translate_v2 as translate
@@ -20,7 +21,18 @@ from languages import (
 ) 
 
 
-def get_translation(translator: "Translator", text: str) -> str:
+@dataclass
+class TranslationReport:
+    text: str
+    translation: str
+    language: Optional[Language] = None
+    
+    @property
+    def n_words(self) -> int:
+        return len(self.text.replace(".", "").replace(",", "").split())
+
+
+def get_translation(translator: "Translator", text: str) -> TranslationReport:
     """
     Given text of a message by an user, generates a content for a response message 
     based on results by the translator instance.
@@ -28,7 +40,10 @@ def get_translation(translator: "Translator", text: str) -> str:
     src, dst_langs = translator.translate(text)
     if src is None:
         awkward_emoji = emojize(":downcast_face_with_sweat:")
-        return f"Не смог распознать язык {awkward_emoji}."
+        return TranslationReport(
+            text,
+            f"Не смог распознать язык {awkward_emoji}."
+        )
     
     src_flag = lang_to_flag[src]
     src_gen = genitive_cases[src]
@@ -41,17 +56,20 @@ def get_translation(translator: "Translator", text: str) -> str:
             result.write(f'<a href="{t.url}"><b>{t.service_name}</b></a>: {t.text}.\n') 
         result.write("\n")
     print(dst.translations)
-    return result.getvalue()
+    return TranslationReport(
+        text=text,
+        translation=result.getvalue(),
+        language=src
+    )
 
-
-@dataclass
+@dataclass(slots=True)
 class Translation:
     text: str
     service_name: str
     url: str
 
 
-@dataclass
+@dataclass(slots=True)
 class TranslationsToTheSameLanguage:
     language: Language
     translations: list[Translation]
@@ -218,9 +236,6 @@ class Translator:
             to_gather.append(service._translate(text, src, dst, self.requestor))
         return await asyncio.gather(*to_gather)
     
-
-
-
 @Translator.register_service
 class DemekRu(TranslationService):
     URL = "https://demek.ru/soz/?q={}"
@@ -380,7 +395,6 @@ class TurkcesozlukNet(TranslationService):
         translated_text = " ".join(p.get_text() for p in points)
         return translated_text, url
 
-
 @Translator.register_service
 class TurengCom(TranslationService):
     URL = "https://tureng.com/en/turkish-english/{}"
@@ -431,3 +445,4 @@ class TurengCom(TranslationService):
             Language.english: "english",
             Language.turkish: "turkish"
         }
+

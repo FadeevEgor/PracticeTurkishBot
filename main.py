@@ -7,10 +7,19 @@ from telegram import Bot, User
 from telegram.constants import ParseMode
 
 from database import UsersTable
+from morphology import morph_analysis
 from router import RequestRouter, CommandRouter, Response
-from telegram_bot import bot_from_config, send_text, parse_message
+from telegram_bot import (
+    bot_from_config, 
+    send_text, 
+    parse_update, 
+    MessageContent,
+    CallbackQueryContent,
+    morphology_keyboard,
+    remove_keyboard
+)
 from translation import Translator, get_translation
-
+from languages import Language
 
 request_routes = RequestRouter()
 command_routes = CommandRouter()
@@ -61,14 +70,14 @@ def command_config(bot: Bot, user: User) -> None:
 @command_routes.command("/subscribe")
 def subscribe(bot: Bot, user: User) -> None:
     user_table.subscribe(user.id)
-    message = 'Вы подписались на "слова дня"!'
-    send_text(bot, user.id, message)
+    message = 'Вы подписались на <b>слово дня</b>!'
+    send_text(bot, user.id, message, parse_mode=ParseMode.HTML)
 
 @command_routes.command("/unsubscribe")
 def subscribe(bot: Bot, user: User) -> None:
     user_table.unsubscribe(user.id) 
-    message = 'Вы отписались от "слова дня"!'
-    send_text(bot, user.id, message)
+    message = 'Вы отписались от <b>слова дня</b>!'
+    send_text(bot, user.id, message, parse_mode=ParseMode.HTML)
 
 @request_routes.route("/webhook")
 def webhook(request: flask.Request) -> Response:
@@ -76,17 +85,33 @@ def webhook(request: flask.Request) -> Response:
     This route is used as telegram webhook.
     All messages to the bot are processed here.
     """
-    user, text, commands = parse_message(request.data, bot)
-    print(user, text, commands)
-    if user is None:
+    content = parse_update(request.data, bot)
+    if content is None:
         return "Unexpected request from telegram", 200
-    if text is not None and text != "":
-        translation = get_translation(translator, text)
-        send_text(bot, user.id, translation, parse_mode=ParseMode.HTML)
-    for command in commands:
-        command_routes.direct(command, bot, user)
-    return "Ok", 200
-
+    text = content.text
+    user = content.user
+    if isinstance(content, MessageContent):
+        if text is not None and text != "":
+            report = get_translation(translator, text)
+            single_turkish_word = report.language == Language.turkish and report.n_words == 1
+            reply_markup = morphology_keyboard(text) if single_turkish_word else None
+            send_text(
+                bot, 
+                user.id, 
+                report.translation, 
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup
+            )
+        for command in content.commands:
+            command_routes.direct(command, bot, user)
+        return "Ok", 200
+    if isinstance(content, CallbackQueryContent):
+        analysis = morph_analysis(text)
+        if analysis is not None:
+            send_text(bot, user.id, analysis, ParseMode.HTML)
+        return "Ok", 200
+    return "Unexpected request from telegram", 200
+    
 @request_routes.route("/external")
 def external(request: flask.Request) -> Response:
     """
