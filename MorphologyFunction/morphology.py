@@ -89,15 +89,3 @@ class Morphology:
         if word in lemmas:
             return False
         return True
-
-
-def main() -> None:
-    word = "yaşındaken"
-    morphology = Morphology()
-    print(morphology.check_if_interesting(word))
-    analysis = morphology.analyze(word)
-    print(analysis)
-
-
-if __name__ == "__main__":
-    main()

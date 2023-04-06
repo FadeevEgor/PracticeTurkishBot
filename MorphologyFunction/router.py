@@ -1,6 +1,6 @@
 import json
 from typing import Callable, TypeAlias, Any
-from flask import Request, jsonify
+from flask import Request, jsonify, abort
 
 
 Route: TypeAlias = Callable[[dict], Any]
@@ -42,8 +42,7 @@ class RequestRouter:
             f = self.functions[method][path]
         except KeyError:
             print(f"Dispatch error: {path, method}")
-            return "<H1>Page not found</H1>", 404
-        else:
-            data = json.loads(request.data)
-            print(f"Calling {f.__name__} function with data={data}.")
-            return jsonify(f(data))
+            return abort(404)
+        data = json.loads(request.data)
+        print(f"Calling {f.__name__} function with data={data}.")
+        return jsonify(f(data))
