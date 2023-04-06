@@ -4,8 +4,7 @@ import hmac
 import json
 import secrets
 import string
-from time import perf_counter
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 import requests
 
@@ -121,7 +120,7 @@ class UserTable:
                     "wotd": False,
                 }
             }
-            response = self.request(key, "insertOne", payload)
+            self.request(key, "insertOne", payload)
         return token
 
     @classmethod
