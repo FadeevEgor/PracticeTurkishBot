@@ -1,3 +1,7 @@
+# lambda_packages
+*_layer.zip
+deployment.zip
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
