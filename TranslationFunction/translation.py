@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from io import StringIO
 from typing import Optional, Type, ClassVar
 
-from aiohttp import ClientSession  # type: ignore
+from aiohttp import ClientSession, ClientSSLError  # type: ignore
 from bs4 import BeautifulSoup
 from bs4.element import Tag, NavigableString
 from google.cloud import translate_v2 as translate  # type: ignore
@@ -21,9 +21,14 @@ from languages import (
 )
 
 
-async def make_request(url: str, session: ClientSession, timeout: int = 3) -> str:
-    async with session.get(url=url, timeout=timeout) as r:
-        return await r.text()
+async def make_request(
+    url: str, session: ClientSession, timeout: int = 3
+) -> str | None:
+    try:
+        async with session.get(url=url, timeout=timeout) as r:
+            return await r.text()
+    except ClientSSLError:
+        return None
 
 
 @dataclass(slots=True)
