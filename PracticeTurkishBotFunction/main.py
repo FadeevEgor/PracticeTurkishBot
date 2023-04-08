@@ -48,6 +48,7 @@ async def command_about(bot: Bot, user: User) -> None:
 @bot_commands.command("/start")
 async def command_start(bot: Bot, user: User) -> None:
     "Generates response message to the command `/start`"
+    user_table.get_token(user.id)
     message = rf"Привет, {user.first_name}!"
     await send_text_async(bot, user.id, message)
     await command_about(bot, user)

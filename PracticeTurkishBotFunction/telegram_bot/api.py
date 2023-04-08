@@ -68,10 +68,9 @@ async def send_text_async(
     return message
 
 
-def split_into_chunks(text: str, max_length: int = 4096) -> list[str]:
+def split_into_chunks(text: str, max_length: int = 3500) -> list[str]:
     "Splits text in chunks of length < 4096."
     rows = text.split("\n")
-
     current_chunk = StringIO()
     chunks: list[str] = []
     current_length = 0
@@ -79,14 +78,14 @@ def split_into_chunks(text: str, max_length: int = 4096) -> list[str]:
     for row in rows:
         row_length = len(row)
         if current_length + row_length < max_length:
-            current_chunk.write(row)
+            current_chunk.write(row + "\n")
             current_length += row_length
         else:
-            chunks.append(current_chunk.getvalue())
+            chunks.append(current_chunk.getvalue().strip())
             current_chunk = StringIO()
             current_length = 0
-    chunks.append("".join(current_chunk))
-    return chunks
+    chunks.append(current_chunk.getvalue().strip())
+    return [c for c in chunks if c]
 
 
 async def answer_callback_query_and_remove_query(
