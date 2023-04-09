@@ -105,3 +105,8 @@ async def edit_keyboard(
         return await bot.edit_message_reply_markup(
             chat_id=chat_id, message_id=message_id, reply_markup=keyboard
         )
+
+
+async def send_action_typing(bot: Bot, chat_id: int) -> bool:
+    async with bot:
+        return await bot.send_chat_action(chat_id=chat_id, action="typing")

@@ -14,14 +14,15 @@ from service import _Data
 from database import UserTable
 from languages import lowercase, detect_language
 from router import RequestRouter
-from telegram_bot.commands import BotCommands
-from telegram_bot.api import (
-    bot_from_config,
-    send_text_async,
+from bot.commands import BotCommands
+from bot.actions import (
     answer_callback_query_and_remove_query,
+    bot_from_config,
     edit_keyboard,
+    send_text_async,
+    send_action_typing,
 )
-from telegram_bot.parsing import parse_update, MessageContent, CallbackQueryContent
+from bot.parsing import parse_update, MessageContent, CallbackQueryContent
 from translation import Translator
 from morphology import Morphology
 from utils import translate_and_send
@@ -101,7 +102,8 @@ async def process_message(bot: Bot, content: MessageContent) -> None:
     if text is not None and text != "":
         text = lowercase(text, detect_language(text))
         async with AsyncClient() as client:
-            message, available = await asyncio.gather(
+            _, message, available = await asyncio.gather(
+                send_action_typing(bot, user.id),
                 translate_and_send(translator, client, bot, user, text),
                 morphology.available(client, text=text),
             )

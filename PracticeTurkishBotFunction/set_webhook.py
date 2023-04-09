@@ -1,6 +1,6 @@
 from configparser import ConfigParser
 from httpx import post  # type: ignore
-from telegram_bot.api import bot_from_config
+from bot.actions import bot_from_config
 
 
 bot = bot_from_config()

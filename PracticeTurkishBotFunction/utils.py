@@ -3,7 +3,7 @@ from telegram import Bot, User, Message  # type: ignore
 from telegram.constants import ParseMode  # type: ignore
 
 from translation import Translator
-from telegram_bot.api import send_text_async
+from bot.actions import send_text_async
 
 
 async def translate_and_send(
