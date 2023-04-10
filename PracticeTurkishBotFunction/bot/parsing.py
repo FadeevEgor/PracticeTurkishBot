@@ -25,7 +25,6 @@ def parse_update(update_data: dict[str, Any], bot: Bot) -> Optional[UpdateConten
     Parses content of a message from telegram.
     Returns a sender user, cleared from commands text and list of commands.
     """
-    print(update_data)
     update = Update.de_json(update_data, bot)
 
     if update is None:
@@ -68,6 +67,7 @@ def parse_message(message: Message, bot: Bot) -> Optional[MessageContent]:
         return None
 
     text = message.text
+    print(f"Message. {user.first_name} : {text}")
     commands = [text[e.offset : e.offset + e.length] for e in message.entities]
     for command in commands:
         text = text.replace(command, "")
