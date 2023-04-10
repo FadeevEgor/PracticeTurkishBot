@@ -27,7 +27,8 @@ async def make_request(
     try:
         async with session.get(url=url, timeout=timeout) as r:
             return await r.text()
-    except ClientSSLError:
+    except (ClientSSLError, asyncio.TimeoutError) as e:
+        print(e)
         return None
 
 
