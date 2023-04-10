@@ -11,7 +11,7 @@ class Morphology(Service):
     async def analyze(self, client: AsyncClient, /, *, word: str) -> str:
         return await self.async_post(client, path="/analyze", data={"word": word})
 
-    async def available(self, client: AsyncClient, /, *, text: str) -> bool:
+    async def is_available(self, client: AsyncClient, /, *, text: str) -> bool:
         if detect_language(text) != Language.turkish:
             return False
         if "." in text:

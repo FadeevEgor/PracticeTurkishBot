@@ -104,8 +104,8 @@ async def process_message(bot: Bot, content: MessageContent) -> None:
         async with AsyncClient() as client:
             _, message, available = await asyncio.gather(
                 send_action_typing(bot, user.id),
-                translate_and_send(translator, client, bot, user, text),
-                morphology.available(client, text=text),
+                translate_and_send(translator, client, text, bot, user.id),
+                morphology.is_available(client, text=text),
             )
         if available:
             keyboard = morphology.keyboard(text)
