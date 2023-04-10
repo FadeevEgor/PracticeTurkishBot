@@ -26,6 +26,7 @@ class TelegramBot(Service):
     ) -> Any:
         for id in chat_ids:
             response = self.send_text(id, text)
+            print(response)
             sleep(pause)
         return response
 
