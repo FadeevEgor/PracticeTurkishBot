@@ -7,7 +7,7 @@ if (Test-Path $DeploymentDirectory) {
 }
 New-Item -Path "." -Name $DeploymentDirectory -ItemType "directory"
 
-.\venv\Scripts\pip.exe install -r .\requirements.txt --target .\python\ --use-pep517
+.\venv\Scripts\python.exe -m pip install -r .\requirements.txt --target .\python\ --use-pep517
 zip -r $DependenciesZip .\python
 Remove-Item -Recurse -Force .\python
 
