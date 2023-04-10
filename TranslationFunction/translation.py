@@ -161,7 +161,7 @@ class TranslationService(ABC):
             return None
 
         translated_text, url = response
-        print(f"{self.__class__}")
+        print(f"{self.__class__.__name__} : {text}")
         return TranslationUnit(translated_text, self.service_name, url)
 
     def _encode_language(self, language: Language) -> str:
