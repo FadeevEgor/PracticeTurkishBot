@@ -1,9 +1,13 @@
 import json
-from typing import Callable, TypeAlias, Any
-from flask import Request, jsonify, abort
+from typing import Callable, TypeAlias
+from flask import Request, Response, abort
 
 
-Route: TypeAlias = Callable[[dict], Any]
+Route: TypeAlias = Callable[[dict], Response]
+
+
+def do_nothing() -> None:
+    return None
 
 
 class RequestRouter:
@@ -18,7 +22,11 @@ class RequestRouter:
             method: {} for method in self.available_methods
         }
 
-    def route(self, path: str, *methods: str) -> Callable[[Route], Route]:
+    def route(
+        self,
+        path: str,
+        *methods: str,
+    ) -> Callable[[Route], Route]:
         "Associates the callable with the path and methods."
 
         def register(function: Route) -> Route:
@@ -28,7 +36,7 @@ class RequestRouter:
 
         return register
 
-    def dispatch(self, request: Request) -> Any:
+    def dispatch(self, request: Request) -> Response:
         """
         Routes a request by calling a callable associated with
         the path in the request. Returns 404 if the path has not
@@ -43,4 +51,4 @@ class RequestRouter:
             return abort(404)
         print(f"Calling {f.__name__} function")
         data = json.loads(request.data)
-        return jsonify(f(data))
+        return f(data)
